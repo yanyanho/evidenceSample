@@ -1,5 +1,20 @@
 package org.bcos.evidence.app;
 
+import org.bcos.evidence.sample.EvidenceData;
+import org.bcos.evidence.sample.PublicAddressConf;
+import org.bcos.evidence.util.Tools;
+import org.bcos.evidence.web3j.Evidence;
+import org.bcos.evidence.web3j.EvidenceSignersData;
+import org.fisco.bcos.channel.client.Service;
+import org.fisco.bcos.web3j.abi.datatypes.Address;
+import org.fisco.bcos.web3j.crypto.*;
+import org.fisco.bcos.web3j.protocol.Web3j;
+import org.fisco.bcos.web3j.protocol.channel.ChannelEthereumService;
+import org.fisco.bcos.web3j.protocol.core.methods.response.TransactionReceipt;
+import org.fisco.bcos.web3j.tuples.generated.Tuple7;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
@@ -7,31 +22,10 @@ import java.security.Key;
 import java.security.KeyStore;
 import java.security.SignatureException;
 import java.security.interfaces.ECPrivateKey;
-import java.util.*;
-import org.bcos.channel.client.Service;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
-import java.util.stream.Collectors;
-import org.bcos.evidence.sample.EvidenceData;
-import org.bcos.evidence.sample.PublicAddressConf;
-import org.bcos.evidence.util.Tools;
-import org.bcos.evidence.web3j.Evidence;
-import org.bcos.evidence.web3j.EvidenceSignersData;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.support.ClassPathXmlApplicationContext;
-import org.bcos.web3j.abi.datatypes.Address;
-import org.bcos.web3j.abi.datatypes.DynamicArray;
-import org.bcos.web3j.abi.datatypes.Type;
-import org.bcos.web3j.abi.datatypes.Utf8String;
-import org.bcos.web3j.abi.datatypes.generated.Bytes32;
-import org.bcos.web3j.abi.datatypes.generated.Uint8;
-import org.bcos.web3j.crypto.Credentials;
-import org.bcos.web3j.crypto.ECKeyPair;
-import org.bcos.web3j.crypto.Keys;
-import org.bcos.web3j.crypto.Sign;
-import org.bcos.web3j.protocol.Web3j;
-import org.bcos.web3j.protocol.channel.ChannelEthereumService;
-import org.bcos.web3j.protocol.core.methods.response.TransactionReceipt;
 
 public class BcosApp {
 	
@@ -41,8 +35,7 @@ public class BcosApp {
 	
 	public static BigInteger gasPrice = new BigInteger("99999999999");
 	public static BigInteger gasLimited = new BigInteger("9999999999999");
-	public static BigInteger initialValue = new BigInteger("0");
-	
+
 	public BcosApp() {
 		evidenceSignersData =null;
 		web3j = null;
@@ -76,10 +69,9 @@ public class BcosApp {
 	    service.run();
 	    PublicAddressConf conf = context.getBean(PublicAddressConf.class);
         ConcurrentHashMap<String, String> addressConf = conf.getAllPublicAddress();
-        ArrayList<Address> arrayList = addressConf.values().stream().map(Address::new).collect(Collectors.toCollection(ArrayList::new));
-        DynamicArray<Address> evidenceSigners = new DynamicArray<Address>(arrayList);
+        ArrayList<String> arrayList = new ArrayList<>(addressConf.values());
         try {
-            evidenceSignersData = EvidenceSignersData.deploy(web3j, credentials, gasPrice, gasLimited, initialValue,evidenceSigners).get();
+            evidenceSignersData = EvidenceSignersData.deploy(web3j, credentials, gasPrice, gasLimited, arrayList).send();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -88,7 +80,7 @@ public class BcosApp {
 	}
 	
 	//newEvidence
-	public Address newEvidence(String keyStoreFileName,String keyStorePassword, String keyPassword,String address,String evidenceId,String evidenceHash) throws Exception {
+	public String newEvidence(String keyStoreFileName,String keyStorePassword, String keyPassword,String address,String evidenceId,String evidenceHash) throws Exception {
 		Credentials credentials=loadkey(keyStoreFileName,keyStorePassword,keyPassword);
 		if(credentials==null){
 			return null;
@@ -102,13 +94,15 @@ public class BcosApp {
 		String evidence_id=evidenceId;
 		String evidence_hash=evidenceHash;
 		//通过hash和key算出一个用户机构签名数据
-		Sign.SignatureData data = Sign.signMessage(evidence_hash.getBytes(), credentials.getEcKeyPair());
+		Sign.SignatureData data = Sign.getSignInterface().signMessage(evidence_hash.getBytes(), credentials.getEcKeyPair());
 		String sign_data=Tools.signatureDataToString(data);
 		TransactionReceipt receipt = null;
 		try {
 			Sign.SignatureData signatureData = Tools.stringToSignatureData(sign_data);
 			System.out.println("正在执行！");
-			receipt = evidenceSignersData.newEvidence(new Utf8String(evidence_hash),new Utf8String(evidence_id),new Utf8String(evidence_id),new Uint8(signatureData.getV()),new Bytes32(signatureData.getR()),new Bytes32(signatureData.getS())).get();
+			Byte v = new Byte(signatureData.getV());
+
+			receipt = evidenceSignersData.newEvidence(evidence_hash,evidence_id,evidence_id,  BigInteger.valueOf(v.intValue()) ,signatureData.getR(),signatureData.getS()).send();
 			List<EvidenceSignersData.NewEvidenceEventEventResponse> newEvidenceList = evidenceSignersData.getNewEvidenceEventEvents(receipt);
 			if (newEvidenceList.size() > 0) {
 	               return newEvidenceList.get(0).addr;
@@ -126,7 +120,7 @@ public class BcosApp {
 	public boolean sendSignatureToBlockChain(String[] args,String evidence_hash) throws Exception{
 		Credentials credentials=loadkey(args[1],args[2],args[3]);
 	    Evidence evidence = Evidence.load(args[4], web3j, credentials,  gasPrice, gasLimited);
-	    Sign.SignatureData data = Sign.signMessage(evidence_hash.getBytes(), credentials.getEcKeyPair());
+	    Sign.SignatureData data = Sign.getSignInterface().signMessage(evidence_hash.getBytes(), credentials.getEcKeyPair());
 		boolean flag=false;
 		try {
 				String signatureString=Tools.signatureDataToString(data);
@@ -137,9 +131,9 @@ public class BcosApp {
 	                throw new SignatureException();
 	            }
 	            System.out.println("开始发送！");
-	            TransactionReceipt receipt = evidence.addSignatures(new Uint8(signature.getV()),
-	                    new Bytes32(signature.getR()),
-	                    new Bytes32(signature.getS())).get();
+	            TransactionReceipt receipt = evidence.addSignatures(  BigInteger.valueOf(new Byte(signature.getV()).intValue()),
+	                    signature.getR(),
+	                   signature.getS()).send();
 	            List<Evidence.AddSignaturesEventEventResponse> addList = evidence.getAddSignaturesEventEvents(receipt);
 	            List<Evidence.AddRepeatSignaturesEventEventResponse> addList2 = evidence.getAddRepeatSignaturesEventEvents(receipt);
 
@@ -167,31 +161,47 @@ public class BcosApp {
 		Evidence evidence = Evidence.load(transactionHash, web3j, credentials,  gasPrice, gasLimited);
 		EvidenceData evidenceData = new EvidenceData();
 		try {
-			List<Type> result2 = evidence.getEvidence().get();
-            if (result2.size() >= 6) {
-                evidenceData.setEvidenceHash(((Utf8String) result2.get(0)).getValue());
-                evidenceData.setEvidenceInfo(((Utf8String) result2.get(1)).getValue());
-                evidenceData.setEvidenceID(((Utf8String) result2.get(2)).getValue());
-                List<Uint8> vlist = ((DynamicArray<Uint8>) result2.get(3)).getValue();
-                List<Bytes32> rlist = ((DynamicArray<Bytes32>) result2.get(4)).getValue();
-                List<Bytes32> slist = ((DynamicArray<Bytes32>) result2.get(5)).getValue();
-                ArrayList<String> signatureList = new ArrayList<String>();
-                for (int i = 0; i < vlist.size(); i++) {
+			Tuple7<String, String, String, List<BigInteger>, List<byte[]>, List<byte[]>, List<String>> result2 = evidence.getEvidence().send();
+  //         if (result2.getSize() >= 6) {
+//                evidenceData.setEvidenceHash(((Utf8String) result2.get(0)).getValue());
+//                evidenceData.setEvidenceInfo(((Utf8String) result2.get(1)).getValue());
+//                evidenceData.setEvidenceID(((Utf8String) result2.get(2)).getValue());
+//                List<Uint8> vlist = ((DynamicArray<Uint8>) result2.get(3)).getValue();
+//                List<Bytes32> rlist = ((DynamicArray<Bytes32>) result2.get(4)).getValue();
+//                List<Bytes32> slist = ((DynamicArray<Bytes32>) result2.get(5)).getValue();
+//                ArrayList<String> signatureList = new ArrayList<String>();
+//                for (int i = 0; i < vlist.size(); i++) {
+//                    Sign.SignatureData signature = new Sign.SignatureData(
+//                            ((vlist.get(i).getValue())).byteValue(),
+//                            (rlist.get(i)).getValue(),
+//                            (slist.get(i)).getValue());
+//                    signatureList.add(Tools.signatureDataToString(signature));
+//                }
+			evidenceData.setEvidenceHash(result2.getValue1());
+			evidenceData.setEvidenceInfo(result2.getValue2());
+			evidenceData.setEvidenceID(result2.getValue3());
+			List<BigInteger> vlist = result2.getValue4();
+			List<byte[]> rlist = result2.getValue5();
+			List<byte[]> slist = result2.getValue6();
+			ArrayList<String> signatureList = new ArrayList<String>();
+
+			for (int i = 0; i < vlist.size(); i++) {
                     Sign.SignatureData signature = new Sign.SignatureData(
-                            ((vlist.get(i).getValue())).byteValue(),
-                            (rlist.get(i)).getValue(),
-                            (slist.get(i)).getValue());
+                            vlist.get(i).byteValue(),
+                            rlist.get(i),
+                            slist.get(i));
                     signatureList.add(Tools.signatureDataToString(signature));
-                }
-                evidenceData.setSignatures(signatureList);
-                List<Address> addresses = ((DynamicArray<Address>) result2.get(6)).getValue();
+             }
+            evidenceData.setSignatures(signatureList);
+
+
+                List<String> addresses = result2.getValue7();
                 ArrayList<String> addressesList = new ArrayList<String>();
                 for (int i = 0; i < addresses.size(); i++) {
-                    String str = addresses.get(i).toString();
+                    String str = addresses.get(i);
                     addressesList.add(str);
                 }
                 evidenceData.setPublicKeys(addressesList);
-            }
 		}  catch (InterruptedException e) {
             throw e;
         } catch (ExecutionException e) {

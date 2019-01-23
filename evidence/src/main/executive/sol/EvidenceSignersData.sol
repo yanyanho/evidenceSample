@@ -1,5 +1,5 @@
 pragma solidity ^0.4.4;
-import "Evidence.sol";
+import "./Evidence.sol";
 
 contract EvidenceSignersData{
         address[] signers;

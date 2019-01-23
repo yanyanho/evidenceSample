@@ -3,7 +3,7 @@ package org.bcos.evidence.app;
 import java.util.List;
 
 import org.bcos.evidence.sample.EvidenceData;
-import org.bcos.web3j.abi.datatypes.Address;
+import org.fisco.bcos.web3j.abi.datatypes.Address;
 
 
 public class Main {
@@ -20,7 +20,7 @@ public class Main {
 	public static void main(String[] args) throws Exception {
 		BcosApp app = new BcosApp();
 		Address address=null;
-		Address newEvidenceAddress=null;
+		String newEvidenceAddress=null;
 		boolean configure = app.loadConfig();
 		if(args.length<4)
 		{

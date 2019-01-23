@@ -10,34 +10,38 @@
     http://www.springframework.org/schema/tx/spring-tx-2.5.xsd
          http://www.springframework.org/schema/aop
     http://www.springframework.org/schema/aop/spring-aop-2.5.xsd">
-    
-    <!-- AMOP消息处理线程池配置，根据实际需要配置 -->
-	<bean id="pool" class="org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor">
-		<property name="corePoolSize" value="50" />
-		<property name="maxPoolSize" value="100" />
-		<property name="queueCapacity" value="500" />
-		<property name="keepAliveSeconds" value="60" />
-		<property name="rejectedExecutionHandler">
-			<bean class="java.util.concurrent.ThreadPoolExecutor.AbortPolicy" />
+
+
+
+	<bean id="groupChannelConnectionsConfig" class="org.fisco.bcos.channel.handler.GroupChannelConnectionsConfig">
+		<property name="allChannelConnections">
+			<list>
+				<bean id="group1"  class="org.fisco.bcos.channel.handler.ChannelConnections">
+					<property name="groupId" value="1" />
+					<property name="connectionsStr">
+						<list>
+							<value>10.107.105.138:30901</value>
+						</list>
+					</property>
+				</bean>
+				<bean id="group3" class="org.fisco.bcos.channel.handler.ChannelConnections">
+					<property name="groupId" value="3" />
+					<property name="connectionsStr">
+						<list>
+							<value>10.107.105.138:30901</value>
+							<value>10.107.105.138:30904</value>
+						</list>
+					</property>
+				</bean>
+			</list>
 		</property>
 	</bean>
-	
-    <!-- 区块链节点信息配置 -->
-    <bean id="channelService" class="org.bcos.channel.client.Service">
-		<property name="orgID" value="User" />
-		<property name="allChannelConnections">
-			<map>
- 				<entry key="User">
- 					<bean class="org.bcos.channel.handler.ChannelConnections">
- 						<property name="connectionsStr">
- 							<list> 
- 								<value>b02b23fafd1b12df773dc6e92f497ae453e09d58551e6dcfedb9516a9c797069cc3631be8462da366b9440d9e8062b2eb0ea3bccede44609a5e1be98ff4bef7b@127.0.0.1:8541</value>
- 							</list>
- 						</property>
- 					</bean>
-				</entry>
-			</map>
-		</property>
+
+
+	<bean id="channelService" class="org.fisco.bcos.channel.client.Service" depends-on="groupChannelConnectionsConfig">
+		<property name="groupId" value="1" />
+		<property name="orgID" value="fisco" />
+		<property name="allChannelConnections" ref="groupChannelConnectionsConfig"></property>
 	</bean>
 	
 	<!-- 公钥信息配置 -->
