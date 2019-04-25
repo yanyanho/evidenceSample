@@ -1,6 +1,7 @@
 apply plugin: 'maven'
 apply plugin: 'java'
 apply plugin: 'eclipse'
+apply plugin: 'idea'
 
 //指定JDK版本,改成系统中版本
 sourceCompatibility = 1.8
@@ -10,11 +11,11 @@ targetCompatibility = 1.8
 
 // In this section you declare where to find the dependencies of your project
 repositories {
-//    maven {
-//         url "http://maven.aliyun.com/nexus/content/groups/public/"
-//    }
+    maven {
+         url "http://maven.aliyun.com/nexus/content/groups/public/"
+    }
 	maven { url 'https://dl.bintray.com/ethereum/maven/' }
-    //mavenLocal()
+    mavenLocal()
     mavenCentral()
 }
 
@@ -22,7 +23,11 @@ repositories {
 // In this section you declare the dependencies for your production and test code
 dependencies {
 
-	compile group: 'org.fisco-bcos', name: 'web3sdk', version: '2.0.1'
+	// https://mvnrepository.com/artifact/org.fisco-bcos/web3sdk
+	compile group: 'org.fisco-bcos', name: 'web3sdk', version: '2.0.0-rc1'
+
+	//compile group: 'org.fisco-bcos', name: 'web3sdk', version: '2.0.2'
+	//compile group:"org.fisco-bcos", name:"web3sdk", version:"2.0.0-SNAPSHOT", changing: true
 }
 
 sourceSets {
